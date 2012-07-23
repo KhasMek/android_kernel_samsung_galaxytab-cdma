@@ -346,6 +346,60 @@ static int __devinit tl2796_probe(struct spi_device *spi)
 	}
 
 	lcd->bl_dev->props.max_brightness = 255;
+	lcd->bl_dev->props.brightness = lcd->bl;
+
+	lcd->lcd_dev = lcd_device_register("s5p_lcd",
+			&spi->dev, lcd, &s5p_lcd_ops);
+	if (!lcd->lcd_dev) {
+		dev_err(lcd->dev, "failed to register lcd\n");
+		ret = -EINVAL;
+		goto err_setup_lcd;
+	}
+
+	lcd->gammaset_class = class_create(THIS_MODULE, "gammaset");
+	if (IS_ERR(lcd->gammaset_class))
+		pr_err("Failed to create class(gammaset_class)!\n");
+
+	lcd->switch_gammaset_dev = device_create(lcd->gammaset_class, &spi->dev, 0, lcd, "switch_gammaset");
+	if (!lcd->switch_gammaset_dev) {
+		dev_err(lcd->dev, "failed to register switch_gammaset_dev\n");
+		ret = -EINVAL;
+		goto err_setup_gammaset;
+	}
+
+	if (device_create_file(lcd->switch_gammaset_dev, &dev_attr_gammaset_file_cmd) < 0)
+		pr_err("Failed to create device file(%s)!\n", dev_attr_gammaset_file_cmd.attr.name);
+
+	lcd->acl_enable = 0;
+	lcd->cur_acl = 0;
+
+	lcd->acl_class = class_create(THIS_MODULE, "aclset");
+	if (IS_ERR(lcd->acl_class))
+		pr_err("Failed to create class(acl_class)!\n");
+
+	lcd->switch_aclset_dev = device_create(lcd->acl_class, &spi->dev, 0, lcd, "switch_aclset");
+	if (IS_ERR(lcd->switch_aclset_dev))
+		pr_err("Failed to create device(switch_aclset_dev)!\n");
+
+	if (device_create_file(lcd->switch_aclset_dev, &dev_attr_aclset_file_cmd) < 0)
+		pr_err("Failed to create device file(%s)!\n", dev_attr_aclset_file_cmd.attr.name);
+
+	 if (sec_class == NULL)
+	 	sec_class = class_create(THIS_MODULE, "sec");
+	 if (IS_ERR(sec_class))
+                pr_err("Failed to create class(sec)!\n");
+
+	 lcd->sec_lcdtype_dev = device_create(sec_class, NULL, 0, NULL, "sec_lcd");
+	 if (IS_ERR(lcd->sec_lcdtype_dev))
+	 	pr_err("Failed to create device(ts)!\n");
+
+	 if (device_create_file(lcd->sec_lcdtype_dev, &dev_attr_lcdtype_file_cmd) < 0)
+	 	pr_err("Failed to create device file(%s)!\n", dev_attr_lcdtype_file_cmd.attr.name);
+
+#ifdef CONFIG_FB_S3C_MDNIE
+	init_mdnie_class();  //set mDNIe UI mode, Outdoormode
+#endif
+
 	spi_set_drvdata(spi, lcd);
 
 	tl2796_ldi_enable(lcd);
